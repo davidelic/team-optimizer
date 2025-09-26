@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Assignment Optimizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .controls {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .slider {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #007bff;
+            cursor: pointer;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .visualization-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .teams-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .team-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .team-header {
+            background: linear-gradient(135deg, #36d1dc 0%, #5b86e5 100%);
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+        }
+        .team-members {
+            padding: 15px;
+        }
+        .member {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .member:last-child {
+            border-bottom: none;
+        }
+        .member-name {
+            font-weight: 500;
+        }
+        .member-rank {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .rank-1 { background: #28a745; color: white; }
+        .rank-2 { background: #6c757d; color: white; }
+        .rank-3 { background: #fd7e14; color: white; }
+        .rank-4 { background: #dc3545; color: white; }
+        .rank-5 { background: #6f42c1; color: white; }
+        .rank-6 { background: #495057; color: white; }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .member-connected {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border-left: 4px solid #28a745;
+            padding-left: 12px;
+        }
+        .connection-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+        .mutual-connection { background: #28a745; }
+        .one-way-connection { background: #ffc107; }
+        .connection-tooltip {
+            font-size: 0.7em;
+            color: #666;
+            margin-left: 5px;
+        }
+        .team-connections {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+        .network-viz {
+            margin-top: 30px;
+        }
+        .network-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Team Assignment Optimizer</h1>
+            <p>Optimize team assignments based on task preferences and teammate preferences</p>
+        </div>
+
+        <div class="controls">
+            <div class="slider-container">
+                <label style="min-width: 150px;"><strong>Alpha (Team vs Task):</strong></label>
+                <input type="range" class="slider" id="alphaSlider" min="0" max="1" step="0.01" value="0.5">
+                <span id="alphaValue" style="min-width: 80px; text-align: center; font-weight: bold;">0.50</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: #666; margin-bottom: 20px;">
+                <span>Task Preferences Priority</span>
+                <span>Teammate Preferences Priority</span>
+            </div>
+            
+            <div class="slider-container">
+                <label style="min-width: 150px;"><strong>Max Unhappy People:</strong></label>
+                <input type="range" class="slider" id="fairnessSlider" min="0" max="15" step="1" value="5">
+                <span id="fairnessValue" style="min-width: 80px; text-align: center; font-weight: bold;">5</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.9em; color: #666;">
+                <span>No people with 5th/6th choice</span>
+                <span>Allow up to 15 people with 5th/6th choice</span>
+            </div>
+            <div style="font-size: 0.8em; color: #888; margin-top: 5px; text-align: center;">
+                Hard constraint: Maximum people assigned to their 5th or 6th choice task
+            </div>
+        </div>
+
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="totalScore">-</div>
+                <div class="metric-label">Total Score</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="avgHappiness">-</div>
+                <div class="metric-label">Average Happiness</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="unhappiestScore">-</div>
+                <div class="metric-label">Unhappiest Person</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="teamSatisfaction">-</div>
+                <div class="metric-label">Team Satisfaction</div>
+            </div>
+            <div class="metric-card" style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);">
+                <div class="metric-value" id="unhappyCount">-</div>
+                <div class="metric-label">People with 5th/6th Choice</div>
+            </div>
+            <div class="metric-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                <div class="metric-value" id="connectionCount">-</div>
+                <div class="metric-label">Mutual Connections</div>
+            </div>
+        </div>
+
+        <div class="visualization-grid">
+            <div class="chart-container">
+                <h3 style="margin-top: 0; margin-bottom: 10px;">Happiness Distribution</h3>
+                <canvas id="happinessChart" width="350" height="200"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3 style="margin-top: 0; margin-bottom: 10px;">Average Rank by Task</h3>
+                <div id="taskRankDisplay" style="padding: 5px;">
+                    <div style="font-size: 0.8em; color: #666; margin-bottom: 10px;">
+                        Lower = better (1st choice best, 6th worst)
+                    </div>
+                    <div id="taskRankGrid" style="display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                        Loading...
+                    </div>
+                    <div style="margin-top: 10px; font-size: 0.7em; color: #666; text-align: center;">
+                        <div style="background: linear-gradient(to right, #22c55e, #eab308, #ef4444); height: 8px; border-radius: 4px; margin: 5px 0;"></div>
+                        1.0 (Excellent) → 6.0 (Poor)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="network-viz">
+            <h2>🤝 Teammate Connection Analysis</h2>
+            <div class="network-container">
+                <div id="networkSummary" style="margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; text-align: center;">
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #28a745;" id="mutualPairs">-</div>
+                            <div style="font-size: 0.9em; color: #666;">Mutual Preferences</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #ffc107;" id="oneWayPairs">-</div>
+                            <div style="font-size: 0.9em; color: #666;">One-way Preferences</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #17a2b8;" id="satisfiedPrefs">-</div>
+                            <div style="font-size: 0.9em; color: #666;">% Preferences Satisfied</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="connectionDetails" style="font-size: 0.9em; color: #666;">
+                    Connection analysis will appear here...
+                </div>
+            </div>
+        </div>
+
+        <div id="teamsContainer">
+            <h2>Team Assignments</h2>
+            <div id="teamsGrid" class="teams-grid">
+                <div class="loading">Optimizing assignments...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data from the Python script
+        const tasks = [
+            "Fingertip Tactile Sensors",
+            "Real Time RGB-only Teleoperation", 
+            "Motor and Actuation Tower Upgrade",
+            "Robot Playing Jenga with RL",
+            "Digital Twin w/ Gaussian Splatting",
+            "PIP-DIP Coupling for Improving Manipulation Capability"
+        ];
+
+        const rawData = [
+            ["Mustafa","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Motor and Actuation Tower Upgrade","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","NONE","NONE","NONE","NONE"],
+            ["Lee","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","Maksymilian Firkowski","Soogon Kim","Dino Lourenco Claro","NONE"],
+            ["Bourquin","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Robot Playing Jenga with RL","Soogon Kim","Matteo Rubini","Artur von Ruffer","Dino Lourenco Claro"],
+            ["Gerstenecker","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Motor and Actuation Tower Upgrade","NONE","NONE","NONE","NONE"],
+            ["El Minawi","Robot Playing Jenga with RL","Fingertip Tactile Sensors","Digital Twin w/ Gaussian Splatting","Real Time RGB-only Teleoperation","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Guy Blumenthal","Frederik Lindegaard Soerensen","Elia Mergaert","Vikash Jeyathevan"],
+            ["Bergmann","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Robot Playing Jenga with RL","Frederik Lindegaard Soerensen","NONE","NONE","NONE"],
+            ["Lourenco Claro","Fingertip Tactile Sensors","Robot Playing Jenga with RL","PIP-DIP Coupling for Improving Manipulation Capability","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Motor and Actuation Tower Upgrade","NONE","NONE","NONE","NONE"],
+            ["Rubini","Real Time RGB-only Teleoperation","Robot Playing Jenga with RL","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","Dino Lourenco Claro","Artur von Ruffer","Fabrice Bourquin","Moritz Wagner"],
+            ["Neff","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Motor and Actuation Tower Upgrade","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Carlo Teufel","Elias Westrup","Simon Gerstenecker","Valentin Simonis"],
+            ["Huber","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Motor and Actuation Tower Upgrade","Valentin Simonis","Simon Gerstenecker","NONE","NONE"],
+            ["Simonis","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","Maxim Huber","Andres Neff","Simon Gerstenecker","NONE"],
+            ["Soerensen","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Motor and Actuation Tower Upgrade","Robot Playing Jenga with RL","Guy Blumenthal","Elia Mergaert","Ismail El Minawi","Vikash Jeyathevan"],
+            ["Blumenthal ","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Elia Mergaert","Frederik Lindegaard Soerensen","Ismail El Minawi","Vikash Jeyathevan"],
+            ["Papadakis","Fingertip Tactile Sensors","Robot Playing Jenga with RL","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Javid Mustafa","Lazaros Christoforidis","NONE","NONE"],
+            ["Rüttgers","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Michail Papadakis","Vikash Jeyathevan","Yucheng Xia","NONE"],
+            ["Schwab","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","Real Time RGB-only Teleoperation","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"],
+            ["Kim","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","Hyunwoo Lee","Fabrice Bourquin","Artur von Ruffer","Matteo Rubini"],
+            ["Xia","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Lukas Ruettgers","NONE","Tingjun Huang","Lazaros Christoforidis"],
+            ["Christoforidis","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Michail Papadakis","Yucheng Xia","Dino Lourenco Claro","NONE"],
+            ["Porsch","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"],
+            ["Mergaert ","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Motor and Actuation Tower Upgrade","Robot Playing Jenga with RL","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","Guy Blumenthal","Frederik Lindegaard Soerensen","Ismail El Minawi","Vikash Jeyathevan"],
+            ["von Ruffer","Real Time RGB-only Teleoperation","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Soogon Kim","Matteo Rubini","Fabrice Bourquin","Carlo Teufel"],
+            ["Teufel","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Elias Westrup","Andres Neff","NONE","NONE"],
+            ["Westrup","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Carlo Teufel","Andres Neff","NONE","NONE"],
+            ["Ramchandani","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Robot Playing Jenga with RL","NONE","NONE","NONE","NONE"],
+            ["Wagner","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","Matteo Rubini","NONE","NONE","NONE"],
+            ["Jeyathevan","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Guy Blumenthal","Elia Mergaert","Frederik Lindegaard Soerensen","Ismail El Minawi"],
+            ["Huang","Real Time RGB-only Teleoperation","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","Matteo Rubini","Artur von Ruffer","Fabrice Bourquin","Soogon Kim"],
+            ["Lai","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"],
+            ["Maksymilian","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"]
+        ];
+
+        let people, taskScores, teamScores;
+        let happinessChart, taskChart;
+
+        // Process data
+        function processData() {
+            people = rawData.map(row => row[0]);
+            
+            // Build task scores (preference ranks: 1st->6 points, 6th->1 point)
+            taskScores = {};
+            rawData.forEach((row, i) => {
+                taskScores[i] = {};
+                const prefs = row.slice(1, 7);
+                
+                // Handle NONE values by filling with remaining tasks
+                const seen = new Set(prefs.filter(p => p !== "NONE"));
+                const missing = tasks.filter(t => !seen.has(t));
+                const filled = [];
+                
+                for (let p of prefs) {
+                    if (p !== "NONE") {
+                        filled.push(p);
+                    } else if (missing.length > 0) {
+                        filled.push(missing.shift());
+                    }
+                }
+                
+                filled.forEach((task, rank) => {
+                    const taskIdx = tasks.indexOf(task);
+                    if (taskIdx >= 0) {
+                        taskScores[i][taskIdx] = 6 - rank; // 1st->6, 2nd->5, etc.
+                    }
+                });
+            });
+
+            // Build team scores (teammate preferences: 1st->4 points, 4th->1 point)
+            teamScores = {};
+            for (let i = 0; i < people.length; i++) {
+                teamScores[i] = {};
+                for (let j = 0; j < people.length; j++) {
+                    teamScores[i][j] = 0;
+                }
+            }
+
+            rawData.forEach((row, i) => {
+                const teammates = row.slice(7, 11);
+                teammates.forEach((mate, rank) => {
+                    if (mate && mate !== "NONE") {
+                        const cleanMate = mate.trim().toLowerCase();
+                        const matchIdx = people.findIndex(p => 
+                            p.toLowerCase().includes(cleanMate) || cleanMate.includes(p.toLowerCase())
+                        );
+                        if (matchIdx >= 0 && matchIdx !== i) {
+                            teamScores[i][matchIdx] = 4 - rank; // 1st->4, 2nd->3, etc.
+                        }
+                    }
+                });
+            });
+        }
+
+        // Constrained greedy assignment algorithm with fairness constraint
+        function optimizeAssignment(alpha, maxUnhappy) {
+            const assignment = new Array(people.length).fill(-1);
+            const taskCounts = new Array(tasks.length).fill(0);
+            const capacity = 5;
+            
+            // Create candidates list with scores and rank info
+            const candidates = [];
+            for (let i = 0; i < people.length; i++) {
+                for (let k = 0; k < tasks.length; k++) {
+                    const taskScore = taskScores[i][k] || 0;
+                    const rank = 7 - taskScore; // Convert score back to rank (1-6)
+                    candidates.push({
+                        person: i,
+                        task: k,
+                        taskScore: taskScore,
+                        rank: rank,
+                        teamScore: 0 // Will be calculated dynamically
+                    });
+                }
+            }
+
+            // Greedy assignment with fairness constraint
+            const assigned = new Set();
+            let unhappyCount = 0; // Track people assigned to 5th/6th choice
+            
+            while (assigned.size < people.length) {
+                let bestScore = -Infinity;
+                let bestCandidate = null;
+                
+                for (let candidate of candidates) {
+                    if (assigned.has(candidate.person) || taskCounts[candidate.task] >= capacity) {
+                        continue;
+                    }
+                    
+                    // Check fairness constraint: don't allow more than maxUnhappy people with 5th/6th choice
+                    if (candidate.rank >= 5 && unhappyCount >= maxUnhappy) {
+                        continue;
+                    }
+                    
+                    // Calculate team score for this assignment
+                    let teamScore = 0;
+                    for (let j = 0; j < people.length; j++) {
+                        if (assignment[j] === candidate.task) {
+                            teamScore += (teamScores[candidate.person][j] || 0) + (teamScores[j][candidate.person] || 0);
+                        }
+                    }
+                    
+                    const totalScore = (1 - alpha) * candidate.taskScore + alpha * teamScore;
+                    
+                    if (totalScore > bestScore) {
+                        bestScore = totalScore;
+                        bestCandidate = candidate;
+                    }
+                }
+                
+                if (bestCandidate) {
+                    assignment[bestCandidate.person] = bestCandidate.task;
+                    taskCounts[bestCandidate.task]++;
+                    assigned.add(bestCandidate.person);
+                    
+                    // Track unhappy assignments
+                    if (bestCandidate.rank >= 5) {
+                        unhappyCount++;
+                    }
+                } else {
+                    // If no valid candidate found, we might need to relax constraints
+                    // For now, just break to avoid infinite loop
+                    console.warn("No valid assignment found - constraint may be too strict");
+                    break;
+                }
+            }
+            
+            return assignment;
+        }
+
+        // Calculate metrics including connection analysis
+        function calculateMetrics(assignment, alpha) {
+            let totalTaskScore = 0;
+            let totalTeamScore = 0;
+            let unhappyCount = 0;
+            let mutualConnections = 0;
+            let oneWayConnections = 0;
+            let totalPreferences = 0;
+            let satisfiedPreferences = 0;
+            const individualScores = [];
+            const connections = [];
+            
+            // Analyze connections
+            for (let i = 0; i < people.length; i++) {
+                for (let j = i + 1; j < people.length; j++) {
+                    const iWantsJ = (teamScores[i][j] || 0) > 0;
+                    const jWantsI = (teamScores[j][i] || 0) > 0;
+                    const sameTeam = assignment[i] === assignment[j];
+                    
+                    if (iWantsJ) totalPreferences++;
+                    if (jWantsI) totalPreferences++;
+                    
+                    if (sameTeam) {
+                        if (iWantsJ && jWantsI) {
+                            mutualConnections++;
+                            connections.push({
+                                person1: i, person2: j, type: 'mutual',
+                                score1: teamScores[i][j], score2: teamScores[j][i]
+                            });
+                            satisfiedPreferences += 2;
+                        } else if (iWantsJ || jWantsI) {
+                            oneWayConnections++;
+                            connections.push({
+                                person1: i, person2: j, type: 'one-way',
+                                score1: teamScores[i][j] || 0, score2: teamScores[j][i] || 0
+                            });
+                            satisfiedPreferences += 1;
+                        }
+                    }
+                }
+            }
+            
+            for (let i = 0; i < people.length; i++) {
+                const taskScore = taskScores[i][assignment[i]] || 0;
+                const rank = 7 - taskScore; // Convert to rank
+                let teamScore = 0;
+                
+                // Count people with 5th/6th choice
+                if (rank >= 5) {
+                    unhappyCount++;
+                }
+                
+                // Calculate team score
+                for (let j = 0; j < people.length; j++) {
+                    if (i !== j && assignment[j] === assignment[i]) {
+                        teamScore += (teamScores[i][j] || 0);
+                    }
+                }
+                
+                totalTaskScore += taskScore;
+                totalTeamScore += teamScore;
+                individualScores.push((1 - alpha) * taskScore + alpha * teamScore);
+            }
+            
+            return {
+                totalScore: totalTaskScore + totalTeamScore,
+                avgHappiness: individualScores.reduce((a, b) => a + b, 0) / individualScores.length,
+                unhappiestScore: Math.min(...individualScores),
+                teamSatisfaction: totalTeamScore / people.length,
+                unhappyCount: unhappyCount,
+                mutualConnections: mutualConnections,
+                oneWayConnections: oneWayConnections,
+                satisfiedPreferences: totalPreferences > 0 ? (satisfiedPreferences / totalPreferences * 100) : 0,
+                connections: connections,
+                individualScores: individualScores,
+                assignment: assignment
+            };
+        }
+
+        // Update visualizations
+        function updateVisualization(alpha, maxUnhappy) {
+            const assignment = optimizeAssignment(alpha, maxUnhappy);
+            const metrics = calculateMetrics(assignment, alpha);
+            
+            // Update metrics display
+            document.getElementById('totalScore').textContent = metrics.totalScore.toFixed(1);
+            document.getElementById('avgHappiness').textContent = metrics.avgHappiness.toFixed(2);
+            document.getElementById('unhappiestScore').textContent = metrics.unhappiestScore.toFixed(2);
+            document.getElementById('teamSatisfaction').textContent = metrics.teamSatisfaction.toFixed(2);
+            document.getElementById('unhappyCount').textContent = metrics.unhappyCount;
+            document.getElementById('connectionCount').textContent = metrics.mutualConnections;
+            
+            // Color the unhappy count based on constraint
+            const unhappyElement = document.getElementById('unhappyCount');
+            const parentCard = unhappyElement.parentElement;
+            if (metrics.unhappyCount <= maxUnhappy) {
+                parentCard.style.background = 'linear-gradient(135deg, #28a745 0%, #20c997 100%)';
+            } else {
+                parentCard.style.background = 'linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)';
+            }
+            
+            // Update network analysis
+            updateNetworkAnalysis(metrics);
+            
+            // Update happiness distribution chart
+            updateHappinessChart(metrics.individualScores);
+            
+            // Update task chart
+            updateTaskChart(assignment);
+            
+            // Update team assignments
+            updateTeamAssignments(assignment, metrics.connections);
+        }
+
+        function updateHappinessChart(scores) {
+            const ctx = document.getElementById('happinessChart').getContext('2d');
+            
+            if (happinessChart) {
+                happinessChart.destroy();
+            }
+            
+            // Create histogram bins
+            const bins = [0, 1, 2, 3, 4, 5, 6];
+            const counts = new Array(bins.length - 1).fill(0);
+            
+            scores.forEach(score => {
+                for (let i = 0; i < bins.length - 1; i++) {
+                    if (score >= bins[i] && score < bins[i + 1]) {
+                        counts[i]++;
+                        break;
+                    }
+                }
+            });
+            
+            happinessChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6'],
+                    datasets: [{
+                        label: 'Number of People',
+                        data: counts,
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTaskChart(assignment) {
+            // Calculate average rank by task
+            const taskRanks = new Array(tasks.length).fill(0);
+            const taskCounts = new Array(tasks.length).fill(0);
+            
+            assignment.forEach((taskIdx, personIdx) => {
+                const rank = 7 - (taskScores[personIdx][taskIdx] || 0); // Convert score back to rank
+                taskRanks[taskIdx] += rank;
+                taskCounts[taskIdx]++;
+            });
+            
+            const avgRanks = taskRanks.map((sum, i) => taskCounts[i] > 0 ? sum / taskCounts[i] : 0);
+            
+            // Create color-coded display with smooth gradient
+            function getRankColor(rank) {
+                // Clamp rank between 1 and 6
+                const clampedRank = Math.max(1, Math.min(6, rank));
+                // Normalize to 0-1 range
+                const normalized = (clampedRank - 1) / 5;
+                
+                // Smooth gradient from green (1) to yellow (3) to red (6)
+                let r, g, b;
+                
+                if (normalized <= 0.4) { // 1.0 to 3.0: green to yellow
+                    const t = normalized / 0.4;
+                    r = Math.round(34 + (234 - 34) * t);   // 34 to 234 (green to yellow red)
+                    g = Math.round(197 + (179 - 197) * t); // 197 to 179 (green to yellow green)
+                    b = Math.round(94 + (8 - 94) * t);     // 94 to 8 (green to yellow blue)
+                } else { // 3.0 to 6.0: yellow to red
+                    const t = (normalized - 0.4) / 0.6;
+                    r = Math.round(234 + (239 - 234) * t); // 234 to 239 (yellow to red red)
+                    g = Math.round(179 + (68 - 179) * t);  // 179 to 68 (yellow to red green)
+                    b = Math.round(8 + (68 - 8) * t);      // 8 to 68 (yellow to red blue)
+                }
+                
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+            
+            function getRankLabel(rank) {
+                if (rank <= 2.0) return 'Excellent';
+                if (rank <= 3.5) return 'Good';
+                if (rank <= 4.5) return 'Fair';
+                return 'Poor';
+            }
+            
+            let html = '';
+            tasks.forEach((task, i) => {
+                const avgRank = avgRanks[i];
+                const color = getRankColor(avgRank);
+                const label = getRankLabel(avgRank);
+                
+                html += `
+                    <div style="
+                        background: ${color}; 
+                        color: white; 
+                        padding: 8px; 
+                        border-radius: 4px; 
+                        text-align: center;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        min-height: 70px;
+                        display: flex;
+                        flex-direction: column;
+                        justify-content: center;
+                    ">
+                        <div style="font-weight: bold; font-size: 0.75em; margin-bottom: 3px; line-height: 1.1;">
+                            ${task.length > 20 ? task.substring(0, 20) + '...' : task}
+                        </div>
+                        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 1px;">
+                            ${avgRank.toFixed(1)}
+                        </div>
+                        <div style="font-size: 0.7em; opacity: 0.9;">
+                            ${label}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            document.getElementById('taskRankGrid').innerHTML = html;
+        }
+
+        function updateNetworkAnalysis(metrics) {
+            document.getElementById('mutualPairs').textContent = metrics.mutualConnections;
+            document.getElementById('oneWayPairs').textContent = metrics.oneWayConnections;
+            document.getElementById('satisfiedPrefs').textContent = metrics.satisfiedPreferences.toFixed(1) + '%';
+            
+            // Simple summary message
+            const totalConnections = metrics.mutualConnections + metrics.oneWayConnections;
+            let summaryHtml = '';
+            if (totalConnections > 0) {
+                summaryHtml = `<strong>Total active connections:</strong> ${totalConnections} pairs working together<br>`;
+                summaryHtml += `<em>Green dots (💚) show mutual preferences, yellow dots (💛) show one-way preferences in the team assignments below.</em>`;
+            } else {
+                summaryHtml = '<em>No teammate preferences satisfied in current assignment. Try increasing the alpha parameter to prioritize teammate preferences.</em>';
+            }
+            
+            document.getElementById('connectionDetails').innerHTML = summaryHtml;
+        }
+
+        function updateTeamAssignments(assignment, connections) {
+            const teamsGrid = document.getElementById('teamsGrid');
+            
+            // Create connection lookup for highlighting
+            const connectionLookup = {};
+            connections.forEach(conn => {
+                const key1 = `${conn.person1}-${conn.person2}`;
+                const key2 = `${conn.person2}-${conn.person1}`;
+                connectionLookup[key1] = conn;
+                connectionLookup[key2] = conn;
+            });
+            
+            // Group people by task
+            const teamsByTask = {};
+            assignment.forEach((taskIdx, personIdx) => {
+                if (!teamsByTask[taskIdx]) {
+                    teamsByTask[taskIdx] = [];
+                }
+                const rank = 7 - (taskScores[personIdx][taskIdx] || 0);
+                teamsByTask[taskIdx].push({
+                    name: people[personIdx],
+                    personIdx: personIdx,
+                    rank: rank
+                });
+            });
+            
+            // Create team cards
+            let html = '';
+            tasks.forEach((task, taskIdx) => {
+                const members = teamsByTask[taskIdx] || [];
+                members.sort((a, b) => a.name.localeCompare(b.name));
+                
+                // Count connections in this team
+                const teamConnections = connections.filter(conn => 
+                    assignment[conn.person1] === taskIdx && assignment[conn.person2] === taskIdx
+                );
+                
+                html += `
+                    <div class="team-card">
+                        <div class="team-header">
+                            ${task}
+                            ${teamConnections.length > 0 ? `<span style="float: right;">🤝 ${teamConnections.length}</span>` : ''}
+                        </div>
+                        <div class="team-members">
+                `;
+                
+                members.forEach(member => {
+                    // Check if this member has connections with other team members
+                    const hasConnections = members.some(otherMember => {
+                        if (member.personIdx === otherMember.personIdx) return false;
+                        const key = `${member.personIdx}-${otherMember.personIdx}`;
+                        return connectionLookup[key];
+                    });
+                    
+                    // Find specific connections for tooltip
+                    const memberConnections = [];
+                    members.forEach(otherMember => {
+                        if (member.personIdx !== otherMember.personIdx) {
+                            const key = `${member.personIdx}-${otherMember.personIdx}`;
+                            const conn = connectionLookup[key];
+                            if (conn) {
+                                memberConnections.push({
+                                    name: otherMember.name,
+                                    type: conn.type
+                                });
+                            }
+                        }
+                    });
+                    
+                    const memberClass = hasConnections ? 'member member-connected' : 'member';
+                    const connectionIndicators = memberConnections.map(conn => 
+                        `<span class="connection-indicator ${conn.type === 'mutual' ? 'mutual-connection' : 'one-way-connection'}" title="Connected to ${conn.name}"></span>`
+                    ).join('');
+                    
+                    html += `
+                        <div class="${memberClass}">
+                            <span class="member-name">
+                                ${member.name}
+                                ${connectionIndicators}
+                            </span>
+                            <span class="member-rank rank-${member.rank}">${member.rank}</span>
+                        </div>
+                    `;
+                });
+                
+                if (teamConnections.length > 0) {
+                    html += `
+                        <div class="team-connections">
+                            <strong>Connections:</strong><br>
+                    `;
+                    teamConnections.forEach(conn => {
+                        const icon = conn.type === 'mutual' ? '💚' : '💛';
+                        let arrow = '↔'; // Default for mutual
+                        
+                        if (conn.type === 'one-way') {
+                            // Determine direction based on who has the preference
+                            if (conn.score1 > 0 && conn.score2 === 0) {
+                                arrow = '→'; // person1 chose person2
+                            } else if (conn.score2 > 0 && conn.score1 === 0) {
+                                arrow = '←'; // person2 chose person1
+                            } else {
+                                arrow = '↔'; // fallback
+                            }
+                        }
+                        
+                        html += `${icon} ${people[conn.person1]} ${arrow} ${people[conn.person2]}<br>`;
+                    });
+                    html += `</div>`;
+                }
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            });
+            
+            teamsGrid.innerHTML = html;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            processData();
+            
+            const alphaSlider = document.getElementById('alphaSlider');
+            const alphaValue = document.getElementById('alphaValue');
+            const fairnessSlider = document.getElementById('fairnessSlider');
+            const fairnessValue = document.getElementById('fairnessValue');
+            
+            function updateAll() {
+                const alpha = parseFloat(alphaSlider.value);
+                const maxUnhappy = parseInt(fairnessSlider.value);
+                updateVisualization(alpha, maxUnhappy);
+            }
+            
+            alphaSlider.addEventListener('input', function() {
+                const alpha = parseFloat(this.value);
+                alphaValue.textContent = alpha.toFixed(2);
+                updateAll();
+            });
+            
+            fairnessSlider.addEventListener('input', function() {
+                const maxUnhappy = parseInt(this.value);
+                fairnessValue.textContent = maxUnhappy.toString();
+                updateAll();
+            });
+            
+            // Initial visualization
+            updateVisualization(0.5, 5);
+        });
+    </script>
+</body>
+</html>
