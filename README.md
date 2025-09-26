@@ -8,11 +8,11 @@ Visit the live demo: **[Team Optimizer Visualization](https://yourusername.githu
 
 ## 📋 Overview
 
-This project solves a common organizational problem: **How do you assign 30 people to 6 different tasks (5 people per task) while maximizing both task satisfaction and team compatibility?**
+This project solves a common organizational problem: **How do you assign 29 people to 6 different tasks (4-5 people per task) while maximizing both task satisfaction and team compatibility?**
 
 ### The Challenge
-- 30 people need to be assigned to 6 tasks
-- Each task requires exactly 5 people  
+- 29 people need to be assigned to 6 tasks
+- Each task gets 4-5 people (5 tasks get 5 people, 1 task gets 4 people)  
 - Each person has ranked preferences for tasks (1st-6th choice)
 - Each person has preferences for teammates (up to 4 people they'd like to work with)
 
@@ -47,7 +47,7 @@ We formulate this as an **Integer Linear Program (ILP)** that optimizes a weight
 ## 🔢 Mathematical Formulation
 
 ### Data
-- **P = {1..30}** people, **T = {1..6}** tasks (capacity = 5 each)
+- **P = {1..29}** people, **T = {1..6}** tasks (capacity = 4-5 each)
 - **rank_task[i][k] ∈ {1..6}** = person i's rank for task k (1 = top choice)
 - **pref_team[i]** = list of up to 4 people i wants to work with
 
@@ -61,7 +61,7 @@ We formulate this as an **Integer Linear Program (ILP)** that optimizes a weight
 
 ### Constraints
 - Each person gets exactly one task: **∀i: Σ_k x[i,k] = 1**
-- Each task has exactly 5 people: **∀k: Σ_i x[i,k] = 5**
+- Each task has 4-5 people: **∀k: Σ_i x[i,k] ∈ {4,5}**
 - Fairness constraint: **Σ_i I(rank[i] ≥ 5) ≤ max_unhappy**
 - Pair variables linked to assignments
 
@@ -84,7 +84,7 @@ We formulate this as an **Integer Linear Program (ILP)** that optimizes a weight
 
 ## 📊 Sample Data
 
-Includes real preference data from 30 participants across 6 robotics research tasks:
+Includes real preference data from 29 participants across 6 robotics research tasks:
 - Fingertip Tactile Sensors
 - Real Time RGB-only Teleoperation  
 - Motor and Actuation Tower Upgrade

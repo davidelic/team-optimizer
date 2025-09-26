@@ -329,8 +329,7 @@
             ["Wagner","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","Matteo Rubini","NONE","NONE","NONE"],
             ["Jeyathevan","Fingertip Tactile Sensors","Real Time RGB-only Teleoperation","Digital Twin w/ Gaussian Splatting","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Guy Blumenthal","Elia Mergaert","Frederik Lindegaard Soerensen","Ismail El Minawi"],
             ["Huang","Real Time RGB-only Teleoperation","Robot Playing Jenga with RL","Digital Twin w/ Gaussian Splatting","PIP-DIP Coupling for Improving Manipulation Capability","Fingertip Tactile Sensors","Motor and Actuation Tower Upgrade","Matteo Rubini","Artur von Ruffer","Fabrice Bourquin","Soogon Kim"],
-            ["Lai","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"],
-            ["Maksymilian","Real Time RGB-only Teleoperation","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Motor and Actuation Tower Upgrade","PIP-DIP Coupling for Improving Manipulation Capability","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"]
+            ["Lai","Fingertip Tactile Sensors","Robot Playing Jenga with RL","Real Time RGB-only Teleoperation","PIP-DIP Coupling for Improving Manipulation Capability","Motor and Actuation Tower Upgrade","Digital Twin w/ Gaussian Splatting","NONE","NONE","NONE","NONE"]
         ];
 
         let people, taskScores, teamScores;
@@ -396,7 +395,18 @@
         function optimizeAssignment(alpha, maxUnhappy) {
             const assignment = new Array(people.length).fill(-1);
             const taskCounts = new Array(tasks.length).fill(0);
-            const capacity = 5;
+            
+            // Calculate team capacities: distribute 29 people across 6 tasks
+            // 5 tasks get 5 people, 1 task gets 4 people
+            const totalPeople = people.length;
+            const numTasks = tasks.length;
+            const baseCapacity = Math.floor(totalPeople / numTasks);
+            const extraSlots = totalPeople % numTasks;
+            
+            const capacities = new Array(numTasks).fill(baseCapacity);
+            for (let i = 0; i < extraSlots; i++) {
+                capacities[i]++;
+            }
             
             // Create candidates list with scores and rank info
             const candidates = [];
@@ -423,7 +433,7 @@
                 let bestCandidate = null;
                 
                 for (let candidate of candidates) {
-                    if (assigned.has(candidate.person) || taskCounts[candidate.task] >= capacity) {
+                    if (assigned.has(candidate.person) || taskCounts[candidate.task] >= capacities[candidate.task]) {
                         continue;
                     }
                     
